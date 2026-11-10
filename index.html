@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operação Uzumaki — TP1 Computação Gráfica</title>
+<style>
+  :root{ --ciano:#2fd6ff; --ambar:#ffb454; --violeta:#a78bfa; --fundo:#070b12; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ width:100%; height:100%; overflow:hidden; background:var(--fundo);
+    font-family:"Segoe UI",system-ui,Arial,sans-serif; color:#dbe7f3; }
+  #gl{ position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:absolute; inset:0; pointer-events:none; z-index:5; }
+  .painel{ background:rgba(7,14,22,.72); border:1px solid rgba(47,214,255,.35);
+    border-radius:10px; padding:10px 14px; backdrop-filter:blur(3px); }
+  #hudEsq{ position:absolute; top:14px; left:14px; min-width:210px; }
+  #hudEsq h1{ font-size:15px; letter-spacing:3px; color:var(--ciano); font-weight:600; }
+  #hudEsq .linha{ font-size:13px; margin-top:5px; letter-spacing:1px; }
+  #hudCel{ color:var(--ciano); font-weight:600; font-size:15px; }
+  #hudPortal{ color:var(--violeta); font-weight:600; }
+  #hudPortal.ativo{ color:#7dffb0; }
+  #hudTimer{ color:#9fb4c8; font-variant-numeric:tabular-nums; }
+  #hudDir{ position:absolute; top:14px; right:14px; text-align:right; font-size:12px;
+    letter-spacing:1px; color:#9fb4c8; }
+  #hudDir b{ color:#dff3ff; font-weight:600; }
+  #hudDica{ position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
+    font-size:12px; letter-spacing:1px; color:#7f93a8; background:rgba(7,14,22,.55);
+    padding:6px 14px; border-radius:20px; border:1px solid rgba(127,147,168,.25); }
+  #msg{ position:absolute; bottom:16%; left:50%; transform:translateX(-50%);
+    font-size:17px; letter-spacing:1.5px; text-align:center; color:#eaf6ff;
+    text-shadow:0 0 14px rgba(47,214,255,.8); opacity:0; white-space:nowrap; }
+
+  /* ---------- Overlays ---------- */
+  .overlay{ position:absolute; inset:0; z-index:10; display:flex; align-items:center;
+    justify-content:center; background:radial-gradient(ellipse at 50% 35%, rgba(10,22,36,.88), rgba(4,7,12,.96)); }
+  .overlay.oculto{ display:none; }
+  .cartao{ max-width:640px; width:min(92vw,640px); text-align:center; padding:34px 40px;
+    border:1px solid rgba(47,214,255,.4); border-radius:16px;
+    background:rgba(9,17,27,.8); box-shadow:0 0 60px rgba(47,214,255,.12) inset; }
+  .cartao h1{ font-size:34px; letter-spacing:10px; color:var(--ciano);
+    text-shadow:0 0 24px rgba(47,214,255,.65); font-weight:700; }
+  .cartao .sub{ margin-top:4px; font-size:12px; letter-spacing:2px; color:#7f93a8; }
+  .cartao .historia{ margin:20px auto 4px; max-width:520px; font-size:14.5px;
+    line-height:1.65; color:#c3d4e4; }
+  .controles{ margin:20px auto 6px; display:grid; grid-template-columns:auto auto;
+    gap:6px 18px; font-size:13px; text-align:left; width:fit-content; }
+  .controles b{ color:var(--ciano); font-weight:600; letter-spacing:1px; text-align:right; }
+  .botao{ margin-top:22px; display:inline-block; pointer-events:auto; cursor:pointer;
+    border:1px solid var(--ciano); color:var(--ciano); background:rgba(47,214,255,.08);
+    padding:10px 26px; border-radius:8px; font-size:15px; letter-spacing:3px;
+    text-decoration:none; font-weight:600; }
+  .botao:hover{ background:rgba(47,214,255,.22); box-shadow:0 0 18px rgba(47,214,255,.35); }
+  .rodape{ margin-top:22px; font-size:12px; color:#7f93a8; letter-spacing:1px; }
+  .rodape a{ color:var(--ambar); text-decoration:none; border-bottom:1px dotted var(--ambar); }
+  .estat{ margin:14px 0 4px; font-size:16px; letter-spacing:1px; color:#c3d4e4; }
+  .estat b{ color:#7dffb0; font-size:20px; }
+  #erroGL{ position:absolute; inset:0; z-index:30; display:none; align-items:center;
+    justify-content:center; background:#0a0f16; color:#ffb4b4; font-size:16px; padding:40px; text-align:center; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="hud">
+  <div id="hudEsq" class="painel">
+    <h1>OPERAÇÃO UZUMAKI</h1>
+    <div class="linha">CÉLULAS <span id="hudCel">0/5</span></div>
+    <div class="linha">PORTAL: <span id="hudPortal">BLOQUEADO</span></div>
+    <div class="linha" id="hudTimer">T+ 00:00</div>
+  </div>
+  <div id="hudDir" class="painel">
+    <div>LUZ: <b id="hudLuz">LIGADA</b> &nbsp;[L]</div>
+    <div>CÂMERA: <b id="hudCam">PERSEGUIÇÃO</b> &nbsp;[C]</div>
+    <div>REINICIAR <b>[R]</b> &nbsp; SAIR <b>[ESC]</b></div>
+  </div>
+  <div id="msg"></div>
+  <div id="hudDica">WASD mover &nbsp;•&nbsp; setas/mouse câmera &nbsp;•&nbsp; SHIFT turbo &nbsp;•&nbsp; L luz &nbsp;•&nbsp; C câmera &nbsp;•&nbsp; R reiniciar</div>
+</div>
+
+<!-- Tela inicial -->
+<div id="menu" class="overlay">
+  <div class="cartao">
+    <h1>OPERAÇÃO UZUMAKI</h1>
+    <div class="sub">TP1 — COMPUTAÇÃO GRÁFICA • IFSULDEMINAS — CAMPUS MACHADO</div>
+    <p class="historia">A <b>Estação Orbital Kepler-7</b> perdeu sua fonte principal de energia.
+      O drone de manutenção <b>UZUMAKI-04</b> foi enviado à baía de carga para recuperar
+      <b>5 células de energia</b> e reativar o <b>portal de saída</b>.
+      Desvie dos contêineres, colete todas as células e escape antes que os sistemas críticos colapsem.</p>
+    <div class="controles">
+      <b>W A S D</b><span>mover o drone</span>
+      <b>SETAS / MOUSE</b><span>ajustar a câmera</span>
+      <b>L</b><span>ligar/desligar a luz principal</span>
+      <b>C</b><span>alternar câmera (perseguição/cinemática)</span>
+      <b>R</b><span>reiniciar a missão</span>
+      <b>ESC</b><span>encerrar</span>
+    </div>
+    <a class="botao" id="btnIniciar">INICIAR MISSÃO&nbsp;&nbsp;[ENTER]</a>
+    <div class="rodape">Integrantes: <b>Nicolas Alves, Lucas Antônio e Brian Martins</b> &nbsp;•&nbsp;
+      <a href="relatorio.pdf">Relatório técnico (PDF)</a></div>
+  </div>
+</div>
+
+<!-- Tela de conclusão -->
+<div id="telaVitoria" class="overlay oculto">
+  <div class="cartao">
+    <h1 style="color:#7dffb0; text-shadow:0 0 24px rgba(125,255,176,.6);">MISSÃO CONCLUÍDA</h1>
+    <div class="sub">PORTAL ESTABILIZADO — A ESTAÇÃO KEPLER-7 ESTÁ OPERACIONAL</div>
+    <p class="estat">Células recuperadas: <b>5/5</b><br>Tempo de missão: <b id="vitoriaTempo">00:00</b></p>
+    <a class="botao" id="btnDeNovo">NOVA MISSÃO&nbsp;&nbsp;[R]</a>
+    <div class="rodape">Apresentação: compare a cena com a luz ligada [L] e desligada</div>
+  </div>
+</div>
+
+<!-- Tela de saída -->
+<div id="telaSaida" class="overlay oculto">
+  <div class="cartao">
+    <h1 style="font-size:26px;">APLICAÇÃO ENCERRADA</h1>
+    <p class="historia">A simulação foi finalizada pelo comando ESC.<br>Você já pode fechar esta aba do navegador.</p>
+  </div>
+</div>
+
+<div id="erroGL">Este navegador não suporta WebGL.<br>Abra o arquivo em Chrome, Edge ou Firefox atualizados.</div>
+
+<!-- Código-fonte (scripts simples, funcionam abrindo direto do disco) -->
+<script src="js/mat.js"></script>
+<script src="js/gl.js"></script>
+<script src="js/texturas.js"></script>
+<script src="js/geometria.js"></script>
+<script src="js/cena.js"></script>
+<script src="js/jogo.js"></script>
+</body>
+</html>

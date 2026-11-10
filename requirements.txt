@@ -1,0 +1,5 @@
+# Dependências apenas para REGENERAR o relatório PDF (tools/gerar_relatorio.py).
+# O JOGO (index.html + js/) não possui dependências: basta abrir em um navegador.
+reportlab>=4.0
+pillow>=10.0
+pypdf>=4.0
